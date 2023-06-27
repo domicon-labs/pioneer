@@ -172,6 +172,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 		//minerExtra
 		types.WritePostRoot(blockNumber, statedb.IntermediateRoot(p.config.IsEIP158(blockNumber)))
+		
+		root2 := statedb.IntermediateRoot_new(p.bc.chainConfig.IsEIP158(block.Number()))
+		log.Info("查看Trie更改", "block", blockNumber, "header.root", block.Header().Root.Hex(), "root", root2.Hex())
+
 		for _, s := range l {
 			sArr := strings.Split(s, "\t")
 			t := sArr[0]
