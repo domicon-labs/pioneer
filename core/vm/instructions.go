@@ -720,7 +720,7 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		gas += params.CallStipend
 		bigVal = value.ToBig()
 	}
-
+	types.WriteStateKey(interpreter.evm.Context.BlockNumber, toAddr)
 	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal)
 	if err != nil {
 		temp.Clear()
