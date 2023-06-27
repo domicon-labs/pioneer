@@ -371,10 +371,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 	blockNumber := st.evm.Context.BlockNumber
 	if contractCreation {
-		var ctAddr common.Address
-		ret, ctAddr, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, msg.Value)
-		types.WriteStateKey(blockNumber, ctAddr)
-		types.WriteStateKey(blockNumber, sender.Address())
+		ret, _, st.gasRemaining, vmerr = st.evm.Create(sender, msg.Data, st.gasRemaining, msg.Value)
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From, st.state.GetNonce(sender.Address())+1)

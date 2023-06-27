@@ -513,6 +513,9 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 			evm.Config.Tracer.CaptureExit(ret, gas-contract.Gas, err)
 		}
 	}
+
+	types.WriteStateKey(evm.Context.BlockNumber, caller.Address())
+	types.WriteStateKey(evm.Context.BlockNumber, address)
 	types.WriteTxCode(evm.Context.BlockNumber, address)
 	return ret, address, contract.Gas, err
 }
