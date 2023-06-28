@@ -413,7 +413,9 @@ func (s *AddressStorageList) Get(address common.Address) (*AddressStorage, bool)
 func InitFile(blockNumber *big.Int) {
 	var f *os.File
 	var err error
-	fileName := "./minerExtra/" + blockNumber.String() + ".txt"
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	os.MkdirAll("./minerExtra/"+left.String(), 0755)
+	fileName := "./minerExtra/" + left.String() + "/" + blockNumber.String() + ".txt"
 	if CheckFileExist(fileName) { //文件存在
 		os.Remove(fileName)
 	}
@@ -429,8 +431,11 @@ func InitFile(blockNumber *big.Int) {
 func InitTxFile(blockNumber *big.Int) {
 	var f *os.File
 	var err error
-	fileName := "./minerExtra/temp/" + blockNumber.String() + ".txt"
-	fileName2 := "./minerExtra/temp/C" + blockNumber.String() + ".txt"
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	os.MkdirAll("./minerExtra/temp/"+left.String(), 0755)
+	os.MkdirAll("./minerExtra/temp/C"+left.String(), 0755)
+	fileName := "./minerExtra/temp/" + left.String() + "/" + blockNumber.String() + ".txt"
+	fileName2 := "./minerExtra/temp/C" + left.String() + "/" + blockNumber.String() + ".txt"
 	if CheckFileExist(fileName) { //文件存在
 		os.Remove(fileName)
 	}
@@ -446,11 +451,24 @@ func InitTxFile(blockNumber *big.Int) {
 }
 
 func ReNameTxFile(blockNumber *big.Int) {
-	oldName := "./minerExtra/temp/" + blockNumber.String() + ".txt"
-	newName := "./minerExtra/temp/C" + blockNumber.String() + ".txt"
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	oldName := "./minerExtra/temp/" + left.String() + "/" + blockNumber.String() + ".txt"
+	newName := "./minerExtra/temp/C" + left.String() + "/" + blockNumber.String() + ".txt"
 	err := os.Rename(oldName, newName)
 	if err != nil {
 		log.Info("ReNameTxFileErr", "error", err)
+	}
+}
+
+func DelTxFile(blockNumber *big.Int) {
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	fileName := "./minerExtra/temp/" + left.String() + "/" + blockNumber.String() + ".txt"
+	fileName2 := "./minerExtra/temp/C" + left.String() + "/" + blockNumber.String() + ".txt"
+	if CheckFileExist(fileName) { //文件存在
+		os.Remove(fileName)
+	}
+	if CheckFileExist(fileName2) { //文件存在
+		os.Remove(fileName2)
 	}
 }
 
@@ -470,7 +488,8 @@ func WriteTxCode(blockNumber *big.Int, address common.Address) {
 }
 
 func WriteTxFile(blockNumber *big.Int, text string) {
-	filePath := "./minerExtra/temp/" + blockNumber.String() + ".txt"
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	filePath := "./minerExtra/temp/" + left.String() + "/" + blockNumber.String() + ".txt"
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		//log.Info("文件打开失败", "文件打开失败", err, "string", text)
@@ -486,7 +505,8 @@ func WriteTxFile(blockNumber *big.Int, text string) {
 
 func ReadTxFile(blockNumber *big.Int, hash common.Hash) []string {
 	var lines []string
-	myfile, err := os.Open("./minerExtra/temp/C" + blockNumber.String() + ".txt") //open the file
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	myfile, err := os.Open("./minerExtra/temp/C" + left.String() + "/" + blockNumber.String() + ".txt") //open the file
 	if err != nil {
 		log.Info("ReadTxFile", "Error opening file:", err)
 		return lines
@@ -581,8 +601,8 @@ func WritePostCode(blockNumber *big.Int, address common.Address, code []byte) {
 }
 
 func WriteFile(blockNumber *big.Int, text string) {
-
-	filePath := "./minerExtra/" + blockNumber.String() + ".txt"
+	left := new(big.Int).Quo(blockNumber, new(big.Int).SetUint64(1000))
+	filePath := "./minerExtra/" + left.String() + "/" + blockNumber.String() + ".txt"
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		//log.Info("文件打开失败", "文件打开失败", err, "string", text)

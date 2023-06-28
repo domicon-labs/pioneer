@@ -75,6 +75,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 		types.WriteHash(header.Number, tx.Hash())
 		if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
 			log.Error("precacheTransaction", "blockNumber", block.Number(), "hash", tx.Hash(), "err", err)
+			types.DelTxFile(header.Number)
 			return // Ugh, something went horribly wrong, bail out
 		}
 		types.WriteHash(header.Number, tx.Hash())
