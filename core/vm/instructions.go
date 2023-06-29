@@ -526,6 +526,7 @@ func opSstore(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 	}
 	loc := scope.Stack.pop()
 	val := scope.Stack.pop()
+	//log.Info("opSstore", "blockNumber", interpreter.evm.Context.BlockNumber, "addr", scope.Contract.Address().Hex(), "key", loc.Hex(), "val", val.Hex())
 	interpreter.evm.StateDB.SetState(scope.Contract.Address(), loc.Bytes32(), val.Bytes32())
 	types.WriteStorageKey(interpreter.evm.Context.BlockNumber, scope.Contract.Address(), loc.Bytes32())
 	return nil, nil

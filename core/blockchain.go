@@ -1748,7 +1748,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, setHead bool) (int, error)
 			//	//}(time.Now(), followup, throwaway)
 			//}
 		}
-
+		//log.Info("---------------------------------------------------")
 		// Process block using the parent state as reference point
 		pstart := time.Now()
 		receipts, logs, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)

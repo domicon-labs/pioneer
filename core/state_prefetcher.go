@@ -17,7 +17,7 @@
 package core
 
 import (
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/consensus/misc"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/consensus"
@@ -49,47 +49,86 @@ func newStatePrefetcher(config *params.ChainConfig, bc *BlockChain, engine conse
 // the transaction messages using the statedb, but any changes are discarded. The
 // only goal is to pre-cache transaction signatures and state trie nodes.
 func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, cfg vm.Config, interrupt *atomic.Bool) {
+	//var (
+	//	header       = block.Header()
+	//	gaspool      = new(GasPool).AddGas(block.GasLimit())
+	//	blockContext = NewEVMBlockContext(header, p.bc, nil)
+	//	evm          = vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
+	//	signer       = types.MakeSigner(p.config, header.Number, header.Time)
+	//)
+	//// Iterate over and process the individual transactions
+	//byzantium := p.config.IsByzantium(block.Number())
+	//if len(block.Transactions()) > 0 {
+	//	types.InitTxFile(header.Number)
+	//}
+	//for i, tx := range block.Transactions() {
+	//	// If block precaching was interrupted, abort
+	//	if interrupt != nil && interrupt.Load() {
+	//		return
+	//	}
+	//	// Convert the transaction into an executable message and pre-cache its sender
+	//	msg, err := TransactionToMessage(tx, signer, header.BaseFee)
+	//	if err != nil {
+	//		return // Also invalid block, bail out
+	//	}
+	//	statedb.SetTxContext(tx.Hash(), i)
+	//	types.WriteHash(header.Number, tx.Hash())
+	//	if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
+	//		log.Error("precacheTransaction", "blockNumber", block.Number(), "hash", tx.Hash(), "err", err)
+	//		types.DelTxFile(header.Number)
+	//		return // Ugh, something went horribly wrong, bail out
+	//	}
+	//	types.WriteHash(header.Number, tx.Hash())
+	//	// If we're pre-byzantium, pre-load trie nodes for the intermediate root
+	//	if !byzantium {
+	//		statedb.IntermediateRoot(true)
+	//	}
+	//}
+	//if len(block.Transactions()) > 0 {
+	//	types.ReNameTxFile(header.Number)
+	//}
+	//// If were post-byzantium, pre-load trie nodes for the final root hash
+	//if byzantium {
+	//	statedb.IntermediateRoot(true)
+	//}
+
 	var (
-		header       = block.Header()
-		gaspool      = new(GasPool).AddGas(block.GasLimit())
-		blockContext = NewEVMBlockContext(header, p.bc, nil)
-		evm          = vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
-		signer       = types.MakeSigner(p.config, header.Number, header.Time)
+		usedGas     = new(uint64)
+		header      = block.Header()
+		blockHash   = block.Hash()
+		blockNumber = block.Number()
+		gp          = new(GasPool).AddGas(block.GasLimit())
 	)
-	// Iterate over and process the individual transactions
-	byzantium := p.config.IsByzantium(block.Number())
+	// Mutate the block and state according to any hard-fork specs
+	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
+		misc.ApplyDAOHardFork(statedb)
+	}
+	var (
+		context = NewEVMBlockContext(header, p.bc, nil)
+		vmenv   = vm.NewEVM(context, vm.TxContext{}, statedb, p.config, cfg)
+		signer  = types.MakeSigner(p.config, header.Number, header.Time)
+	)
 	if len(block.Transactions()) > 0 {
 		types.InitTxFile(header.Number)
 	}
+	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		// If block precaching was interrupted, abort
-		if interrupt != nil && interrupt.Load() {
-			return
-		}
-		// Convert the transaction into an executable message and pre-cache its sender
 		msg, err := TransactionToMessage(tx, signer, header.BaseFee)
 		if err != nil {
-			return // Also invalid block, bail out
+			types.DelTxFile(header.Number)
+			return
 		}
 		statedb.SetTxContext(tx.Hash(), i)
 		types.WriteHash(header.Number, tx.Hash())
-		if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
-			log.Error("precacheTransaction", "blockNumber", block.Number(), "hash", tx.Hash(), "err", err)
+		_, err = applyTransaction(msg, p.config, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
+		if err != nil {
 			types.DelTxFile(header.Number)
-			return // Ugh, something went horribly wrong, bail out
+			return
 		}
 		types.WriteHash(header.Number, tx.Hash())
-		// If we're pre-byzantium, pre-load trie nodes for the intermediate root
-		if !byzantium {
-			statedb.IntermediateRoot(true)
-		}
 	}
 	if len(block.Transactions()) > 0 {
 		types.ReNameTxFile(header.Number)
-	}
-	// If were post-byzantium, pre-load trie nodes for the final root hash
-	if byzantium {
-		statedb.IntermediateRoot(true)
 	}
 }
 
