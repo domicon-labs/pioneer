@@ -59,6 +59,7 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+
 	var (
 		receipts    types.Receipts
 		usedGas     = new(uint64)
@@ -68,6 +69,9 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		allLogs     []*types.Log
 		gp          = new(GasPool).AddGas(block.GasLimit())
 	)
+	if blockNumber.Uint64() > 3000000 {
+		return nil, nil, 0, fmt.Errorf("stop")
+	}
 	// Mutate the block and state according to any hard-fork specs
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
@@ -93,77 +97,42 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 
 		types.WritePreRoot(blockNumber, statedb.IntermediateRoot(p.config.IsEIP158(blockNumber)))
 		l := types.ReadTxFile(blockNumber, tx.Hash())
+		temp := make(map[string]bool)
 		for _, s := range l {
 			sArr := strings.Split(s, "\t")
 			t := sArr[0]
 			switch t {
 			case "0":
 				addr := common.HexToAddress(sArr[1])
+				if temp["0"+sArr[1]] {
+					continue
+				}
 				if enc, error := statedb.GetAccountEnc(addr); error == nil {
-					//proof, err := statedb.GetProof(addr)
-					//if err != nil {
-					//	log.Info("GetProof Err", "addr", addr, "GetProof", err)
-					//	return nil, nil, 0, err
-					//}
 					types.WritePreState(blockNumber, addr, enc)
-					//types.WritePreStateProof(blockNumber, addr, proof)
-					//log.Info("账户信息", "blockNumber", blockNumber, "addr", addr)
-					//roothash := statedb.IntermediateRoot(p.config.IsEIP158(blockNumber))
-					//tempProof := types.NewExtraProof(proof)
-					//log.Info("Proof信息", "accountProof", roothash, "roothash[:]", roothash[:], "tempProof", tempProof, "proof", proof)
-					//value2, err2 := trie.VerifyProof(roothash, crypto.Keccak256Hash(addr.Bytes()).Bytes(), tempProof)
-					//log.Info("Proof验证", "value2", value2, "err2", err2)
-
-					//data := new(types.StateAccount)
-					//if err := rlp.DecodeBytes(enc, data); err != nil {
-					//	log.Error("Failed to decode state object", "addr", addr, "err", err)
-					//}
-					//log.Info("Account", "blockNumber", blockNumber, "hash", tx.Hash().Hex(), "addr", addr, "stobject", data)
-
+					temp["0"+sArr[1]] = true
 				}
 			case "1":
+				if temp[sArr[1]+sArr[2]] {
+					continue
+				}
 				addr := common.HexToAddress(sArr[1])
 				hash := common.HexToHash(sArr[2])
 				val := statedb.GetState(addr, hash)
-				//txExtra.AddPreStorage(addr, hash, val)
 				types.WritePreStorage(blockNumber, addr, hash, val)
-				//if proof, err := statedb.GetStorageProof(addr, hash); err == nil {
-				//if tx.Hash().String() == "0x10d0e6b3bce2988501490c31a2ba9a2e3b49c27ef8381480cebde87eb8402d96" && addr.String() == "0x0000000000000000000000000000000000001002" {
-				//	enc, _ := Ctrie.TryGet(addr.Bytes())
-				//	data := new(types.StateAccount)
-				//	if err := rlp.DecodeBytes(enc, data); err != nil {
-				//		log.Error("Failed to decode state object", "addr", addr, "err", err)
-				//	}
-				//	log.Info("GetStorageProof", "blockNumber", blockNumber, "addr", addr, "hash", hash, "proof", proof, "account", data.Root)
-				//}
-				//types.WritePreStorageProof(blockNumber, addr, hash, proof)
-
-				//enc, _ := Ctrie.TryGet(addr.Bytes())
-				//data := new(types.StateAccount)
-				//if err := rlp.DecodeBytes(enc, data); err != nil {
-				//	log.Error("Failed to decode state object", "addr", addr, "err", err)
-				//}
-				//tempProof := types.NewExtraProof(proof)
-				//log.Info("Proof信息", "root", data.Root.Hex(), "key", hash, "val", val, "tempProof", tempProof)
-
-				//value1, _ := trie.VerifyProof(data.Root, crypto.Keccak256Hash(hash.Bytes()).Bytes(), tempProof)
-
-				//log.Info("txExtra", "hash", tx.Hash().Hex(), "addr", addr, "key", hash.Hex(), "c", val, "value", value1)
-				//log.Info("Proof验证", "value1", value1, "err1", err1)
-				//if !bytes.Equal(common.BytesToHash(value1).Bytes(), val.Bytes()) {
-				//	log.Info("测试数据", "key", hash.String(), "hash", tx.Hash().Hex(), "value", value1, "val", val.Bytes())
-				//}
-
-				//value2, err2 := trie.VerifyProof(roothash, crypto.Keccak256Hash(hash.Bytes()).Bytes(), tempProof)
-				//log.Info("Proof验证", "value2", value2, "err2", err2)
-				//txExtra.AddPreStorageProof(addr, hash, proof)
-				//}
+				temp[sArr[1]+sArr[2]] = true
 			case "2":
+				if temp["2"+sArr[1]] {
+					continue
+				}
 				addr := common.HexToAddress(sArr[1])
 				code := statedb.GetCode(addr)
 				types.WritePreCode(blockNumber, addr, code)
+				temp["2"+sArr[1]] = true
 			default:
 			}
+		}
+		if i == len(block.Transactions())-1 {
+			types.DelTxFile(blockNumber)
 		}
 		receipt, err := applyTransaction(msg, p.config, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
@@ -171,44 +140,6 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 		//minerExtra
 		types.WritePostRoot(blockNumber, statedb.IntermediateRoot(p.config.IsEIP158(blockNumber)))
-
-		//root2 := statedb.IntermediateRoot_new(p.bc.chainConfig.IsEIP158(block.Number()))
-		//log.Info("查看Trie更改", "block", blockNumber, "header.root", block.Header().Root.Hex(), "root", root2.Hex())
-
-		//for _, s := range l {
-		//	sArr := strings.Split(s, "\t")
-		//	t := sArr[0]
-		//	switch t {
-		//	case "0":
-		//		addr := common.HexToAddress(sArr[1])
-		//		if enc, error := statedb.GetAccountEnc(addr); error == nil {
-		//			//txExtra.AddPostState(addr, enc)
-		//			proof, err := statedb.GetProof(addr)
-		//			if err != nil {
-		//				return nil, nil, 0, err
-		//			}
-		//			//txExtra.AddPostStateProof(addr, proof)
-		//			types.WritePostState(blockNumber, addr, enc)
-		//			types.WritePostStateProof(blockNumber, addr, proof)
-		//		}
-		//
-		//	case "1":
-		//		addr := common.HexToAddress(sArr[1])
-		//		hash := common.HexToHash(sArr[2])
-		//		val := statedb.GetState(addr, hash)
-		//		//txExtra.AddPostStorage(addr, hash, val)
-		//		types.WritePostStorage(blockNumber, addr, hash, val)
-		//		if proof, err := statedb.GetStorageProof(addr, hash); err == nil {
-		//			types.WritePostStorageProof(blockNumber, addr, hash, proof)
-		//		}
-		//	case "2":
-		//		addr := common.HexToAddress(sArr[1])
-		//		code := statedb.GetCode(addr)
-		//		types.WritePostCode(blockNumber, addr, code)
-		//	default:
-		//
-		//	}
-		//}
 		types.WriteTxHash(blockNumber, tx.Hash())
 
 		receipts = append(receipts, receipt)
